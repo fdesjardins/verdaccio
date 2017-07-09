@@ -1,9 +1,10 @@
 import React from 'react';
-import {Button, Dialog, Input, MessageBox} from 'element-react';
+import { Button, Dialog, Input, MessageBox } from 'element-react';
 import styled from 'styled-components';
 import API from '../../../utils/api';
 import storage from '../../../utils/storage';
 import _ from 'lodash';
+import { Link } from 'react-router-dom';
 
 import classes from './header.scss';
 
@@ -67,15 +68,37 @@ export default class Header extends React.Component {
     }
   }
 
+  get isTokenExpire () {
+    let token = storage.getItem('token');
+    if (!_.isString(token)) return true;
+    let payload = token.split('.')[1];
+    if (!payload) return true;
+    try {
+      payload = JSON.parse(atob(payload));
+    } catch (err) {
+      console.error('Invalid token:', err, token); // eslint-disable-line
+      return false;
+    }
+    if (!payload.exp || !_.isNumber(payload.exp)) return true;
+    let jsTimestamp = (payload.exp * 1000) - 30000; // Report as expire before (real expire time - 30s)
+
+    let expired = Date.now() >= jsTimestamp;
+    if (expired) {
+      storage.clear();
+    }
+
+    return expired;
+  }
+
   handleLogout () {
     storage.clear();
     location.reload();
   }
 
   renderUserActionButton () {
-    if (storage.getItem('username')) { // TODO: Check jwt token expire
+    if (!this.isTokenExpire) { // TODO: Check jwt token expire
       return (
-        <div className={classes.welcome}>
+        <div className={ classes.welcome }>
           Hi, {storage.getItem('username')}
           &nbsp;
           <Button type="danger" onClick={this.handleLogout}>Logout</Button>
@@ -90,7 +113,9 @@ export default class Header extends React.Component {
     return (
       <header className={ classes.header }>
         <div className={ classes.headerWrap }>
-          <img src={ logo } className={ classes.logo } />
+          <Link to="/">
+            <img src={ logo } className={ classes.logo } />
+          </Link>
           <SetupGuide>
             npm set registry { location.origin }
             <br/>
